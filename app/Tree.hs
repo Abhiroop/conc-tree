@@ -1,12 +1,14 @@
 module Tree where
 
-import Prelude hiding (head, tail)
+import Prelude hiding (head, tail, foldMap)
 import Data.Maybe
 
 data Conc a =
     Empty
   | Singleton a -- store final array here
-  | Concat (Conc a) (Conc a) --enrich this with more info -- the bit partition
+  | Concat (Conc a) (Conc a) --enrich this with more info -- the bit partition - thats for lookup not imp
+                             --enrich with height info -- imp for balancing
+                             --enrich with level info for concurrency
   deriving (Show, Eq)
 
 rebalance :: Conc a -> Conc a
@@ -91,3 +93,46 @@ append :: List a -> List a -> List a
 append Empty ys = ys
 append xs Empty = xs
 append xs ys = rebalance (conc xs ys)
+
+addleft :: a -> List a -> List a
+addleft x Empty = Singleton x
+addleft x xs@(Singleton _) = append (Singleton x) xs
+addleft x (Concat ys zs) = append (addleft x ys) zs
+
+addright :: List a -> a -> List a
+addright Empty x = Singleton x
+addright xs@(Singleton _) x = append xs (Singleton x)
+addright (Concat ys zs) x = append ys (addright zs x)
+
+{-
+map
+reduce
+length
+filter
+reverse
+-}
+
+foldMap :: ParallelMonoid m
+          => (a -> m)
+          -> List a -- the actual structure
+          -> m
+foldMap _ Empty = par_mempty
+foldMap f (Singleton x) = f x
+foldMap f (Concat ys zs) = par_mappend (foldMap f ys) (foldMap f zs) -- parallelism hidden here
+
+foldMap' :: (a -> m)
+         -> (m -> m -> m)
+         -> m
+         -> List a -- the actual structure
+         -> m
+foldMap' _ _ unit Empty = unit
+foldMap' f _ _ (Singleton x) = f x
+foldMap' f g unit (Concat ys zs) = g (foldMap' f g unit ys) (foldMap' f g unit zs) -- parallelism hidden here
+
+length :: List a -> Int
+length xs = foldMap' (\x -> 1) (+) 0 xs
+
+class ParallelMonoid m where
+  par_mempty :: m
+  par_mappend :: m -> m -> m
+
