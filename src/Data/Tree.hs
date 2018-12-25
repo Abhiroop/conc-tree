@@ -1,4 +1,4 @@
-module Tree where
+module Data.Tree where
 
 import Prelude hiding (head, tail, foldMap)
 import Data.Maybe
