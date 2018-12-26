@@ -40,13 +40,14 @@ cons = insert
 conc :: Ord a => List a -> List a -> List a
 conc E E     = E
 conc E (S a) = S a
-conc E (C c l r) = C c l r
+conc E (C h c l r) = C h c l r
 conc (S a) E = S a
 conc (S a) (S b) = insert a (S b)
-conc (S a) (C c l r) = insert a (C c l r)
-conc (C c l r) E = C c l r
-conc (C c l r) (S a) = balance B (C c l r) (S a)
-conc (C c1 l1 r1) (C c2 l2 r2) = balance B (C c1 l1 r1) (C c2 l2 r2)
+conc (S a) (C h c l r) = insert a (C h c l r)
+conc (C h c l r) E = C h c l r
+conc (C h c l r) (S a) = balance (1 + h) B (C h c l r) (S a)
+conc (C h1 c1 l1 r1) (C h2 c2 l2 r2) =
+  balance (1 + max h1 h2) B (C h1 c1 l1 r1) (C h2 c2 l2 r2)
 
 {-
 list == S
@@ -69,12 +70,12 @@ split xs conc = xs
 head :: List a -> Maybe a
 head E = Nothing
 head (S x) = Just x
-head (C _ l _) = head l
+head (C _ _ l _) = head l
 
 tail :: Ord a => List a -> Maybe (List a)
 tail E = Nothing
 tail (S x) = Nothing
-tail (C _ l r)
+tail (C _ _ l r)
   = let left_tail = fromMaybe E (tail l)
      in Just $ conc left_tail r
 
@@ -82,12 +83,12 @@ tail (C _ l r)
 addleft :: Ord a => a -> List a -> List a
 addleft x E = S x
 addleft x xs@(S _) = conc (S x) xs
-addleft x (C _ ys zs) = conc (addleft x ys) zs
+addleft x (C _ _ ys zs) = conc (addleft x ys) zs
 
 addright :: Ord a => List a -> a -> List a
 addright E x = S x
 addright xs@(S _) x = conc xs (S x)
-addright (C _ ys zs) x = conc ys (addright zs x)
+addright (C _ _ ys zs) x = conc ys (addright zs x)
 
 {-
 map
@@ -103,11 +104,13 @@ foldMap :: Monoid m
           -> m
 foldMap _ E = mempty
 foldMap f (S x) = f x
-foldMap f (C _ ys zs) = par2 mappend (foldMap f ys) (foldMap f zs)
+foldMap f (C _ _ ys zs) = par2 mappend (foldMap f ys) (foldMap f zs)
 
 par2 :: (a -> b -> c) -> a -> b -> c
 par2 f x y = x `par` y `par` f x y
 
+map :: Ord b => (a -> b) -> List a -> List b
+map f xs = foldMap (\x -> S (f x)) xs
 
 length :: List a -> Int
 length = getSum . foldMap (\_ -> Sum 1)

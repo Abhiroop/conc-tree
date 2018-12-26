@@ -10,16 +10,26 @@ data Conc a =
                              --enrich with level info for concurrency
   deriving (Show, Eq)
 -}
+type Height = Int
 
-
-
-data Color = R | B deriving Show
+data Color
+  = R
+  | B
+  deriving (Show)
 
 data Tree a
   = E
   | S a
-  | C Color (Tree a) (Tree a)
-  deriving Show
+  | C Height
+      Color
+      (Tree a)
+      (Tree a)
+  deriving (Show)
+
+height :: Tree a -> Int
+height E = 0
+height (S _) = 0
+height (C h _ _ _) = h
 
 {-
 Inv 1. No red node has a red parent.
@@ -30,35 +40,45 @@ insert :: Ord a => a -> Tree a -> Tree a
 insert x xs = makeBlack $ ins xs
   where
     ins E = S x
-    ins (S a) = C R (S x) (S a)
-    ins (C c l r) = balance c (ins l) r -- always traverse left and trust the balancing
-
-    makeBlack (C _ l r) = C B l r
+    ins (S a) = C 1 R (S x) (S a)
+    ins (C h c l r) = balance h c (ins l) r -- always traverse left and trust the balancing
+    makeBlack (C h _ l r) = C h B l r
     makeBlack a = a
 
-balance :: Color -> Tree a -> Tree a -> Tree a
-
-balance B (C R (C R a b) c) d = C R (C B a b) (C B c d)
-balance B (C R a (C R b c)) d = C R (C B a b) (C B c d)
-balance B a (C R (C R b c) d) = C R (C B a b) (C B c d)
-balance B a (C R b (C R c d)) = C R (C B a b) (C B c d)
-balance color a b = C color a b
+balance :: Height -> Color -> Tree a -> Tree a -> Tree a
+balance h B (C h1 R (C h2 R a b) c) d =
+  let h_child = 1 + max (height c) (height d)
+      h_parent = 1 + max h2 h_child
+  in C h_parent R (C h2 B a b) (C h_child B c d)
+balance h B (C h1 R a (C h2 R b c)) d =
+  let h_child_1 = 1 + max (height a) (height b)
+      h_child_2 = 1 + max (height c) (height d)
+      h_parent = 1 + max h_child_1 h_child_2
+  in C h_parent R (C h_child_1 B a b) (C h_child_2 B c d)
+balance h B a (C h1 R (C h2 R b c) d) =
+  let h_child_1 = 1 + max (height a) (height b)
+      h_child_2 = 1 + max (height c) (height d)
+      h_parent = 1 + max h_child_1 h_child_2
+  in C h_parent R (C h_child_1 B a b) (C h_child_2 B c d)
+balance h B a (C h1 R b (C h2 R c d)) =
+  let h_child = 1 + max (height a) (height b)
+      h_parent = 1 + max h2 h_child
+  in C h_parent R (C h2 B a b) (C h_child B c d)
+balance _ color a b = C (1 + max (height a) (height b)) color a b
 
 ---------Steele's Accessors------------
-
 left :: Tree a -> Tree a
-left E         = E
+left E = E
 left (S _) = E
-left (C _ l _) = l
+left (C _ _ l _) = l
 
 right :: Tree a -> Tree a
-right E         = E
+right E = E
 right (S _) = E
-right (C _ _ r)  = r
+right (C _ _ _ r) = r
 
 split :: Tree a -> (Tree a -> Tree a -> Tree a) -> Tree a
-split E _         = E
+split E _ = E
 split (S _) _ = E
-split (C _ l r) f  = f l r
-
+split (C _ _ l r) f = f l r
 ---------------------------------------
