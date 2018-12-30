@@ -24,7 +24,6 @@ data Tree a
       Color
       (Tree a)
       (Tree a)
-  deriving (Show)
 
 height :: Tree a -> Int
 height E = 0
@@ -65,6 +64,26 @@ balance h B a (C h1 R b (C h2 R c d)) =
       h_parent = 1 + max h2 h_child
   in C h_parent R (C h2 B a b) (C h_child B c d)
 balance _ color a b = C (1 + max (height a) (height b)) color a b
+
+
+{-
+list == S
+item == remove S
+
+list :: a -> List a
+list x = S x
+
+item :: List a -> a
+item (S x) = x
+item _ = error "sorry partial"
+
+-- Theorems
+list . item = id
+conc (left xs) (right xs) = xs
+split xs conc = xs
+
+-}
+
 
 ---------Steele's Accessors------------
 left :: Tree a -> Tree a

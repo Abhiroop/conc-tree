@@ -2,10 +2,10 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Data.List
  ( List (..)
- , addright
  , cons
  , empty
  , head
+ , snoc
  , tail
 
  ----- Predicates----
@@ -45,6 +45,12 @@ instance Ord a => Monoid (List a) where
   mempty = E
   mappend = (<>)
 
+instance Show a => Show (List a) where
+  show t = "C " ++ go t
+    where
+      go E = "E"
+      go (S x) = show x
+      go (C _ _ l r) = go l ++ "," ++ go r
 
 parallelDepth = 4 -- a magic number
 
@@ -76,23 +82,6 @@ conc (C h c l r) (S a) = balance (1 + h) B (C h c l r) (S a)
 conc (C h1 c1 l1 r1) (C h2 c2 l2 r2) =
   balance (1 + max h1 h2) B (C h1 c1 l1 r1) (C h2 c2 l2 r2)
 
-{-
-list == S
-item == remove S
-
-list :: a -> List a
-list x = S x
-
-item :: List a -> a
-item (S x) = x
-item _ = error "sorry partial"
-
--- Theorems
-list . item = id
-conc (left xs) (right xs) = xs
-split xs conc = xs
-
--}
 
 head :: List a -> Maybe a
 head E = Nothing
@@ -107,10 +96,10 @@ tail (C _ _ l r)
      in Just $ conc left_tail r
 
 
-addright :: Ord a => List a -> a -> List a
-addright E x = S x
-addright xs@(S _) x = conc xs (S x)
-addright (C _ _ ys zs) x = conc ys (addright zs x)
+snoc :: Ord a => List a -> a -> List a
+snoc E x = S x
+snoc xs@(S _) x = conc xs (S x)
+snoc (C _ _ ys zs) x = conc ys (snoc zs x)
 
 
 -- When you want to redefine the mempty and mappend operation
