@@ -1,18 +1,42 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-module Data.List where
+module Data.List
+ ( List (..)
+ , addright
+ , cons
+ , empty
+ , head
+ , tail
 
+ ----- Predicates----
+ , null
+ , singleton
+
+ ----- Operations----
+ , filter
+ , foldMap
+ , length
+ , map
+ , reverse
+ )
+where
+
+import Control.Concurrent.Utils
+import GHC.Conc
 import Data.Maybe
 import Data.Monoid
 import Data.Internal.Tree
 
-import Prelude hiding (head, tail, foldMap, length)
+import Prelude hiding ( head, tail, foldMap, length
+                      , reverse, last, map, null
+                      , filter)
 
-import GHC.Conc
 
-
--- XXX: Can Conc be Foldable?
-
+-- XXX: Can conc List be Foldable? Yes with a newtype wrapper
 type List a = Tree a
+
+empty :: List a
+empty = E
 
 instance Ord a => Semigroup (List a) where
   (<>) = conc
@@ -20,6 +44,9 @@ instance Ord a => Semigroup (List a) where
 instance Ord a => Monoid (List a) where
   mempty = E
   mappend = (<>)
+
+
+parallelDepth = 4 -- a magic number
 
 --------------- Predicates-------------
 
@@ -80,34 +107,43 @@ tail (C _ _ l r)
      in Just $ conc left_tail r
 
 
-addleft :: Ord a => a -> List a -> List a
-addleft x E = S x
-addleft x xs@(S _) = conc (S x) xs
-addleft x (C _ _ ys zs) = conc (addleft x ys) zs
-
 addright :: Ord a => List a -> a -> List a
 addright E x = S x
 addright xs@(S _) x = conc xs (S x)
 addright (C _ _ ys zs) x = conc ys (addright zs x)
 
-{-
-map
-reduce
-length
-filter
-reverse
--}
+
+-- When you want to redefine the mempty and mappend operation
+foldMap' :: (a -> m)
+         -> (m -> m -> m)
+         -> m
+         -> List a -- the actual structure
+         -> m
+foldMap' f g unit t = go t 0
+  where
+    go E _ = unit
+    go (S x) _ = f x
+    go (C h _ !ys !zs) n
+      | n <= parallelDepth = gol `par` gor `par` g gol gor
+      | otherwise = g gol gor
+      where
+        gol = go ys (n + 1)
+        gor = go zs (n + 1)
 
 foldMap :: Monoid m
           => (a -> m)
           -> List a -- the actual structure
           -> m
-foldMap _ E = mempty
-foldMap f (S x) = f x
-foldMap f (C _ _ ys zs) = par2 mappend (foldMap f ys) (foldMap f zs)
-
-par2 :: (a -> b -> c) -> a -> b -> c
-par2 f x y = x `par` y `par` f x y
+foldMap f t = go t 0
+  where
+    go E _ = mempty
+    go (S x) _ = f x
+    go (C h _ !ys !zs) n
+      | n <= parallelDepth = gol `par` gor `par` mappend gol gor
+      | otherwise = mappend gol gor
+      where
+        gol = go ys (n + 1)
+        gor = go zs (n + 1)
 
 map :: Ord b => (a -> b) -> List a -> List b
 map f xs = foldMap (\x -> S (f x)) xs
@@ -115,14 +151,14 @@ map f xs = foldMap (\x -> S (f x)) xs
 length :: List a -> Int
 length = getSum . foldMap (\_ -> Sum 1)
 
+reverse :: Ord a => List a -> List a
+reverse = foldMap' S (\ys zs -> conc zs ys) E
 
 last :: Ord a => List a -> Maybe a
-last xs = go xs
-  where
-    go l = let penult = head l
-            in case penult of
-                 Nothing -> Nothing
-                 (Just l') -> let z = tail l
-                              in case z of
-                                   Nothing -> Just l'
-                                   otherwise -> go (fromMaybe E z)
+last = head . reverse
+
+fold :: Monoid m => List m -> m
+fold = foldMap id
+
+filter :: Ord a => (a -> Bool) -> List a -> List a
+filter p = foldMap (\x -> if p x then (S x) else E)
