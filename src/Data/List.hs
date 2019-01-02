@@ -2,9 +2,11 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 module Data.List
  ( List (..)
+ , conc
  , cons
  , empty
  , head
+ , single
  , snoc
  , tail
 
@@ -38,10 +40,21 @@ type List a = Tree a
 empty :: List a
 empty = E
 
-instance Ord a => Semigroup (List a) where
-  (<>) = conc
+single :: a -> List a
+single = S
 
-instance Ord a => Monoid (List a) where
+instance (Semigroup a) => Semigroup (List a) where
+  E <> E = E
+  E <> (S a) = S a
+  E <> (C _ _ !l !r) = l <> r
+  (S a) <> E = S a
+  (S a) <> (S b) = S (a <> b)
+  (S a) <> (C _ _ !l !r) = (S a) <> (l <> r)
+  (C _ _ !l !r) <> E = l <> r
+  (C _ _ !l !r) <> (S a) = l <> r <> (S a)
+  (C _ _ !l1 !r1) <> (C _ _ !l2 !r2) = (l1 <> r1) <> (l2 <> r2)
+
+instance (Semigroup a) => Monoid (List a) where
   mempty = E
   mappend = (<>)
 
@@ -127,14 +140,24 @@ foldMap f t = go t 0
   where
     go E _ = mempty
     go (S x) _ = f x
-    go (C h _ !ys !zs) n
+    go (C h _ ys zs) n
       | n <= parallelDepth = gol `par` gor `par` mappend gol gor
       | otherwise = mappend gol gor
       where
         gol = go ys (n + 1)
         gor = go zs (n + 1)
 
-map :: Ord b => (a -> b) -> List a -> List b
+-- foldMap :: Monoid m
+--           => (a -> m)
+--           -> List a -- the actual structure
+--           -> m
+-- foldMap f t = go t
+--   where
+--     go E = mempty
+--     go (S x) = f x
+--     go (C h _ ys zs) = mappend (go ys) (go zs)
+
+map :: (Semigroup b) => (a -> b) -> List a -> List b
 map f xs = foldMap (\x -> S (f x)) xs
 
 length :: List a -> Int
@@ -149,5 +172,5 @@ last = head . reverse
 fold :: Monoid m => List m -> m
 fold = foldMap id
 
-filter :: Ord a => (a -> Bool) -> List a -> List a
+filter :: (Semigroup a) => (a -> Bool) -> List a -> List a
 filter p = foldMap (\x -> if p x then (S x) else E)

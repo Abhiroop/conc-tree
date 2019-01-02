@@ -20,10 +20,10 @@ data Color
 data Tree a
   = E
   | S a
-  | C Height
-      Color
-      (Tree a)
-      (Tree a)
+  | C {-# UNPACK #-} !Height
+      !Color
+      !(Tree a)
+      !(Tree a)
 
 height :: Tree a -> Int
 height E = 0
