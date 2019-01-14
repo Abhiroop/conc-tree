@@ -108,6 +108,10 @@ tail (C _ _ l r)
   = let left_tail = fromMaybe E (tail l)
      in Just $ conc left_tail r
 
+last :: List a -> Maybe a
+last E = Nothing
+last (S x) = Just x
+last (C _ _ _ r) = last r
 
 snoc :: Ord a => List a -> a -> List a
 snoc E x = S x
@@ -166,11 +170,13 @@ length = getSum . foldMap (\_ -> Sum 1)
 reverse :: Ord a => List a -> List a
 reverse = foldMap' S (\ys zs -> conc zs ys) E
 
-last :: Ord a => List a -> Maybe a
-last = head . reverse
-
 fold :: Monoid m => List m -> m
 fold = foldMap id
 
 filter :: (Semigroup a) => (a -> Bool) -> List a -> List a
 filter p = foldMap (\x -> if p x then (S x) else E)
+
+-- mergesort :: Ord a => List a -> List a
+-- mergesort E = E
+-- mergesort (S x) = S x
+-- mergesort xs = merge_mappend (mergesort (left xs)) (mergesort (right xs))

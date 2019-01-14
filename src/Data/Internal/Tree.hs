@@ -22,13 +22,14 @@ data Tree a
   | S a
   | C {-# UNPACK #-} !Height
       !Color
-      !(Tree a)
-      !(Tree a)
+      (Tree a)
+      (Tree a)
 
 height :: Tree a -> Int
 height E = 0
 height (S _) = 0
 height (C h _ _ _) = h
+
 
 {-
 Inv 1. No red node has a red parent.
